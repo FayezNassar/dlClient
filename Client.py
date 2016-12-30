@@ -28,6 +28,7 @@ def main(client_id):
         response_message = response.read().decode('utf-8')
         conn.close()
         image_file_index = json.loads(response_message)['image_file_index']
+        print('image_index_file: ' + str(image_file_index))
         mode = str(json.loads(response_message)['mode'])
         if mode == 'done':
             return
@@ -43,22 +44,22 @@ def main(client_id):
             for j in range(300):
                 lin_neural_network_l2.W.data[i][j] = l2_w_list[i][j]
         mlp = MLP(lin_neural_network_l1, lin_neural_network_l2)
-
+        file_images_name = '~/images_train/image_' + str(image_file_index)
+        file_labels_name = '~/labels_train/label_' + str(image_file_index)
         if mode == "train":
-            train(client_id, mlp, image_file_index, l1_w_list, l2_w_list)
+            train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
         if mode == "validation":
-            validate(client_id, mlp)
+            validate(client_id, mlp, file_images_name, file_labels_name)
 
 
-def train(client_id, mlp, image_file_index, l1_w_list, l2_w_list):
-    print("working in file: " + str(image_file_index))
-    file_images_name = '~/images_train/image_' + str(image_file_index)
-    file_labels_name = '~/labels_train/label_' + str(image_file_index)
+def train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
+    print('train')
     # Create a model
     model = L.Classifier(mlp)
     # Setup an optimizer
     optimizer = chainer.optimizers.Adam()
     optimizer.setup(model)
+    model.links()
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -91,7 +92,7 @@ def train(client_id, mlp, image_file_index, l1_w_list, l2_w_list):
 
     # Run the training
     start_time = time.time()
-    trainer.run()
+    # trainer.run()
     end_time = time.time()
 
     # compute the deltas and send them
@@ -119,8 +120,41 @@ def train(client_id, mlp, image_file_index, l1_w_list, l2_w_list):
     conn.close()
 
 
-def validate(client_id, mlp):
+def validate(client_id, mlp, file_images_name, file_labels_name):
+    print('validation')
 
+    # download validation files, images and labels.
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
+    cmd_images = 'cat ' + file_images_name
+    images_stdin, images_stdout, images_stderr = ssh.exec_command(cmd_images)
+    read_image = str(images_stdout.read(), 'utf-8')
+    read_image = re.split('\[', read_image)
+    cmd_labels = 'cat ' + file_labels_name
+    labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
+    read_labels = str(labels_stdout.read(), 'utf-8')
+    ssh.close()
+
+    # fill the arrays of images the labels.
+    label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
+    images_array = [None] * 1200
+    for i in range(0, 1200):
+        images_array[i] = np.fromstring(read_image[i + 1], dtype=np.float32, sep=' ')
+        # images_array[i].resize(28, 28)
+    for i in range(0, 1200):
+        out = mlp.classify(images_array[i])
+        print('out_' + str(i) + ": " + str(out))
+        print('label_' + str(i) + ": " + str(label_array[i]))
+
+    # TODO fill the the data of the network accuracy, and send back to the server.
+    data = {
+        'mode': 'validation',
+    }
+    conn = http.client.HTTPConnection("localhost", 8000)
+    conn.request("POST", "/hello/deepLearning", json.dumps(data))
+    conn.getresponse()
+    conn.close()
     return 0
 
 
