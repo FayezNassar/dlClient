@@ -140,8 +140,7 @@ def validate(client_id, mlp, file_images_name, file_labels_name):
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
     images_array = [None] * 1200
     for i in range(0, 1200):
-        images_array[i] = np.fromstring(read_image[i + 1], dtype=np.float32, sep=' ')
-        # images_array[i].resize(28, 28)
+        images_array[i] = np.fromstring(read_image[i + 1], dtype=np.float32, sep=' ').reshape(1, 784)
     for i in range(0, 1200):
         out = mlp.classify(images_array[i])
         print('out_' + str(i) + ": " + str(out))

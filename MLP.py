@@ -17,12 +17,10 @@ class MLP(Chain):
 
     def mlp_forward(self, x):
         out1 = self.l1(x)
-        out2 = F.relu(out1)
+        out2 = F.sigmoid(out1)
         return F.sigmoid(self.l2(out2))
 
     def classify(self, x_data):
         x = Variable(x_data)
-        print(type(x))
-        print('x_data.ndim: ' + str(x.ndim))
         h = self.mlp_forward(x)
         return F.softmax(h)
