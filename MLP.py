@@ -23,4 +23,4 @@ class MLP(Chain):
     def classify(self, x_data):
         x = Variable(x_data)
         h = self.mlp_forward(x)
-        return F.softmax(h)
+        return h.data[0].tolist().index(max(h.data[0]))
