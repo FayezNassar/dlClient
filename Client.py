@@ -28,6 +28,7 @@ def main(client_id):
         response_message = response.read().decode('utf-8')
         conn.close()
         image_file_index = json.loads(response_message)['image_file_index']
+        epoch_number = json.loads(response_message)['epoch_number']
         print('image_index_file: ' + str(image_file_index))
         mode = str(json.loads(response_message)['mode'])
         if mode == 'done':
@@ -49,7 +50,7 @@ def main(client_id):
         if mode == "train":
             train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
         if mode == "validation":
-            validate(client_id, mlp, file_images_name, file_labels_name)
+            validate(client_id, mlp, epoch_number, file_images_name, file_labels_name)
 
 
 def train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
@@ -120,9 +121,7 @@ def train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_li
     conn.close()
 
 
-def validate(client_id, mlp, file_images_name, file_labels_name):
-    print('validation')
-
+def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
     # download validation files, images and labels.
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -141,14 +140,16 @@ def validate(client_id, mlp, file_images_name, file_labels_name):
     images_array = [None] * 1200
     for i in range(0, 1200):
         images_array[i] = np.fromstring(read_image[i + 1], dtype=np.float32, sep=' ').reshape(1, 784)
+    hit = 0
     for i in range(0, 1200):
         out = mlp.classify(images_array[i])
-        print('out_' + str(i) + ": " + str(out))
-        print('label_' + str(i) + ": " + str(label_array[i]))
-
-    # TODO fill the the data of the network accuracy, and send back to the server.
+        if out == label_array[i]:
+            hit += 1
+    accuracy = (hit / 1200) * 100
     data = {
-        'mode': 'validation',
+        'mode': 'validation' ,
+        'accuracy': accuracy ,
+        'epoch_number': epoch_number,
     }
     conn = http.client.HTTPConnection("localhost", 8000)
     conn.request("POST", "/hello/deepLearning", json.dumps(data))
