@@ -21,7 +21,6 @@ def get_start():
 
 
 def main(client_id):
-    #firas
     while True:
         conn = http.client.HTTPConnection("localhost", 8000)
         conn.request("GET", "/hello/deepLearning")
