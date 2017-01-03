@@ -9,33 +9,37 @@ from chainer.training import extensions
 from chainer.datasets import tuple_dataset
 import numpy as np
 import json
+import requests
 import time
 
+url = 'https://deeplearningserver.herokuapp.com/hello/'
 
 def get_start():
-    conn = http.client.HTTPConnection("localhost", 8000)
-    conn.request("POST", "/hello/joinSystem", '')
-    response = conn.getresponse()
-    _client_id = str(response.read().decode('utf-8'))
+    response = requests.post(url + 'joinSystem')
+    _client_id = str(response.content.decode('utf-8'))
+    print(int(_client_id))
     return int(_client_id)
 
 
 def main(client_id):
     while True:
-        conn = http.client.HTTPConnection("localhost", 8000)
-        conn.request("GET", "/hello/deepLearning")
-        response = conn.getresponse()
-        response_message = response.read().decode('utf-8')
-        conn.close()
-        image_file_index = json.loads(response_message)['image_file_index']
-        epoch_number = json.loads(response_message)['epoch_number']
+        response = requests.get(url + 'deepLearning')
+        json_data = json.loads(response.text)
+        # response_message = response.content().decode('utf-8')
+        image_file_index = json_data['image_file_index']
+        epoch_number = json_data['epoch_number']
         print('image_index_file: ' + str(image_file_index))
-        mode = str(json.loads(response_message)['mode'])
+        print('epoch_number: ' + str(epoch_number))
+        mode = str(json_data['mode'])
         if mode == 'done':
             return
 
-        l1_w_list = json.loads(response_message)['l1_w']
-        l2_w_list = json.loads(response_message)['l2_w']
+        if mode == 'wait':
+            time.sleep(1.5)
+            continue
+
+        l1_w_list = json_data['l1_w']
+        l2_w_list = json_data['l2_w']
         lin_neural_network_l1 = L.Linear(784, 300)
         lin_neural_network_l2 = L.Linear(300, 10)
         for i in range(300):
@@ -115,10 +119,7 @@ def train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_li
         'l2_delta': delta_layer2.tolist()
     }
     print("total_time: " + str(total_time))
-    conn = http.client.HTTPConnection("localhost", 8000)
-    conn.request("POST", "/hello/deepLearning", json.dumps(data))
-    conn.getresponse()
-    conn.close()
+    requests.post(url + 'deepLearning"', json.dumps(data))
 
 
 def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
@@ -151,10 +152,7 @@ def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
         'accuracy': accuracy ,
         'epoch_number': epoch_number,
     }
-    conn = http.client.HTTPConnection("localhost", 8000)
-    conn.request("POST", "/hello/deepLearning", json.dumps(data))
-    conn.getresponse()
-    conn.close()
+    requests.post(url + 'deepLearning', json.dumps(data))
     return 0
 
 
