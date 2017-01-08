@@ -1,4 +1,3 @@
-import http.client
 import chainer.links as L
 import chainer
 from MLP import MLP
@@ -11,8 +10,10 @@ import numpy as np
 import json
 import requests
 import time
+from pymongo import MongoClient
 
 url = 'https://deeplearningserver.herokuapp.com/hello/'
+
 
 def get_start():
     response = requests.post(url + 'joinSystem')
@@ -31,6 +32,7 @@ def main(client_id):
         print('image_index_file: ' + str(image_file_index))
         print('epoch_number: ' + str(epoch_number))
         mode = str(json_data['mode'])
+        print('mode: ' + mode)
         if mode == 'done':
             return
 
@@ -38,8 +40,10 @@ def main(client_id):
             time.sleep(1.5)
             continue
 
-        l1_w_list = json_data['l1_w']
-        l2_w_list = json_data['l2_w']
+        client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
+        _db = client.primre
+        l1_w_list = _db.GlobalParameters.find_one({'id': 1})['l1_list']
+        l2_w_list = _db.GlobalParameters.find_one({'id': 1})['l2_list']
         lin_neural_network_l1 = L.Linear(784, 300)
         lin_neural_network_l2 = L.Linear(300, 10)
         for i in range(300):
@@ -52,12 +56,12 @@ def main(client_id):
         file_images_name = '~/images_train/image_' + str(image_file_index)
         file_labels_name = '~/labels_train/label_' + str(image_file_index)
         if mode == "train":
-            train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
+            train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
         if mode == "validation":
             validate(client_id, mlp, epoch_number, file_images_name, file_labels_name)
 
 
-def train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
+def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
     print('train')
     # Create a model
     model = L.Classifier(mlp)
@@ -110,19 +114,30 @@ def train(client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_li
     for i in range(300):
         for j in range(784):
             delta_layer1[i][j] = mlp.l1.W.data[i][j] - l1_w_list[i][j];
-
+    while _db.GlobalParameters.find_one({'id': 1})['list_busy'] == 1:
+        continue
+    _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 1}})
+    l1_list = _db.GlobalParameters.find_one({'id': 1})['l1_list']
+    l2_list = _db.GlobalParameters.find_one({'id': 1})['l2_list']
+    for i in range(300):
+        for j in range(784):
+            l1_list[i][j] += (delta_layer1[i][j] * 0.1)  # 0.1 is the learning rate.
+    for i in range(10):
+        for j in range(300):
+            l2_list[i][j] += (delta_layer2[i][j] * 0.1)  # 0.1 is the learning rate.
+    _db.GlobalParameters.update({'id': 1}, {'$set': {'l1_list': l1_list, 'l2_list': l2_list}})
+    _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 0}})
     data = {
         'id': client_id,
         'mode': 'train',
         'work_time': total_time,
-        'l1_delta': delta_layer1.tolist(),
-        'l2_delta': delta_layer2.tolist()
     }
     print("total_time: " + str(total_time))
     requests.post(url + 'deepLearning"', json.dumps(data))
 
 
 def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
+    print('validate')
     # download validation files, images and labels.
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -148,8 +163,8 @@ def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
             hit += 1
     accuracy = (hit / 1200) * 100
     data = {
-        'mode': 'validation' ,
-        'accuracy': accuracy ,
+        'mode': 'validation',
+        'accuracy': accuracy,
         'epoch_number': epoch_number,
     }
     requests.post(url + 'deepLearning', json.dumps(data))
