@@ -33,7 +33,7 @@ def main(client_id):
         print('epoch_number: ' + str(epoch_number))
         mode = str(json_data['mode'])
         print('mode: ' + mode)
-        if mode == 'done':
+        if mode == 'stop':
             return
 
         if mode == 'wait':
@@ -55,10 +55,14 @@ def main(client_id):
         mlp = MLP(lin_neural_network_l1, lin_neural_network_l2)
         file_images_name = '~/images_train/image_' + str(image_file_index)
         file_labels_name = '~/labels_train/label_' + str(image_file_index)
+        if mode == 'test':
+            file_images_name = '~/images_test/images_' + str(image_file_index)
+            file_labels_name = '~/labels_test/label_' + str(image_file_index)
         if mode == "train":
             train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
-        if mode == "validation":
-            validate(client_id, mlp, epoch_number, file_images_name, file_labels_name)
+        else:
+            validate_test(mode, client_id, mlp, epoch_number, file_images_name, file_labels_name)
+
 
 
 def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
@@ -136,7 +140,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     requests.post(url + 'deepLearning"', json.dumps(data))
 
 
-def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
+def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
     print('validate')
     # download validation files, images and labels.
     ssh = paramiko.SSHClient()
@@ -163,7 +167,7 @@ def validate(client_id, mlp, epoch_number, file_images_name, file_labels_name):
             hit += 1
     accuracy = (hit / 1200) * 100
     data = {
-        'mode': 'validation',
+        'mode': mode,
         'accuracy': accuracy,
         'epoch_number': epoch_number,
     }
