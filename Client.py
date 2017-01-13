@@ -61,7 +61,7 @@ def main(client_id):
         if mode == "train":
             train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
         else:
-            validate_test(mode, client_id, mlp, epoch_number, file_images_name, file_labels_name)
+            validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name)
 
 
 
