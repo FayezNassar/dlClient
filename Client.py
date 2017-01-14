@@ -105,7 +105,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
 
     # Run the training
     start_time = time.time()
-    # trainer.run()
+    trainer.run()
     end_time = time.time()
 
     # compute the deltas and send them
