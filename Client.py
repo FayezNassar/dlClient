@@ -27,8 +27,8 @@ def main(client_id):
         response = requests.get(url + 'deepLearning')
         json_data = json.loads(response.text)
         # response_message = response.content().decode('utf-8')
-        image_file_index = json_data['image_file_index']
-        epoch_number = json_data['epoch_number']
+        image_file_index = int(json_data['image_file_index'])
+        epoch_number = int(json_data['epoch_number'])
         print('image_index_file: ' + str(image_file_index))
         print('epoch_number: ' + str(epoch_number))
         mode = str(json_data['mode'])
@@ -42,8 +42,10 @@ def main(client_id):
 
         client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
         _db = client.primre
+        print('start download network')
         l1_w_list = _db.GlobalParameters.find_one({'id': 1})['l1_list']
         l2_w_list = _db.GlobalParameters.find_one({'id': 1})['l2_list']
+        print('finish download network')
         lin_neural_network_l1 = L.Linear(784, 300)
         lin_neural_network_l2 = L.Linear(300, 10)
         for i in range(300):
@@ -74,6 +76,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     optimizer.setup(model)
     model.links()
 
+    print('start download file')
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
@@ -85,6 +88,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
     read_labels = str(labels_stdout.read(), 'utf-8')
     ssh.close()
+    print('finish download file')
 
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
     images_array = [None] * 1200
@@ -143,6 +147,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
 def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
     print('validate_test, mode is: ' + str(mode))
     # download validation files, images and labels.
+    print('start file download')
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
@@ -154,7 +159,7 @@ def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
     labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
     read_labels = str(labels_stdout.read(), 'utf-8')
     ssh.close()
-
+    print('finish file download')
 
     # fill the arrays of images the labels.
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
