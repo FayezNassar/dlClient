@@ -58,11 +58,11 @@ def main(client_id):
         if mode == 'test':
             file_images_name = '~/images_test/images_' + str(image_file_index)
             file_labels_name = '~/labels_test/label_' + str(image_file_index)
+
         if mode == "train":
             train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
         else:
             validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name)
-
 
 
 def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
@@ -105,7 +105,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
 
     # Run the training
     start_time = time.time()
-    trainer.run()
+    # trainer.run()
     end_time = time.time()
 
     # compute the deltas and send them
@@ -141,7 +141,7 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
 
 
 def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
-    print('validate')
+    print('validate_test, mode is: ' + str(mode))
     # download validation files, images and labels.
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -157,15 +157,16 @@ def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
 
     # fill the arrays of images the labels.
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
-    images_array = [None] * 1200
-    for i in range(0, 1200):
+    images_number = 1200 if (mode == 'train') else 200
+    images_array = [None] * images_number
+    for i in range(0, images_number):
         images_array[i] = np.fromstring(read_image[i + 1], dtype=np.float32, sep=' ').reshape(1, 784)
     hit = 0
-    for i in range(0, 1200):
+    for i in range(0, images_number):
         out = mlp.classify(images_array[i])
         if out == label_array[i]:
             hit += 1
-    accuracy = (hit / 1200) * 100
+    accuracy = (hit / images_number) * 100
     data = {
         'mode': mode,
         'accuracy': accuracy,
