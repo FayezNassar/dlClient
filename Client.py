@@ -155,6 +155,7 @@ def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
     read_labels = str(labels_stdout.read(), 'utf-8')
     ssh.close()
 
+
     # fill the arrays of images the labels.
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
     images_number = 1200 if (mode == 'train') else 200
