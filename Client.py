@@ -24,52 +24,55 @@ def get_start():
 
 def main(client_id):
     while True:
-        response = requests.get(url + 'deepLearning')
-        json_data = json.loads(response.text)
-        # response_message = response.content().decode('utf-8')
-        image_file_index = int(json_data['image_file_index'])
-        epoch_number = int(json_data['epoch_number'])
-        print('image_index_file: ' + str(image_file_index))
-        print('epoch_number: ' + str(epoch_number))
-        mode = str(json_data['mode'])
-        print('mode: ' + mode)
-        if mode == 'stop':
-            return
-
-        if mode == 'wait':
-            time.sleep(1.5)
-            continue
-
-        client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
-        _db = client.primre
-        print('start download network')
         try:
-            network = _db.Network.find_one({'id': 1})
-            l1_w_list = network['l1_list']
-            l2_w_list = network['l2_list']
-        except:
-            _db.GlobalParameters.update_one({'id': 1}, {'$inc': {'image_file_index': -1}})
-            continue
-        print('finish download network')
-        lin_neural_network_l1 = L.Linear(784, 300)
-        lin_neural_network_l2 = L.Linear(300, 10)
-        for i in range(300):
-            for j in range(784):
-                lin_neural_network_l1.W.data[i][j] = l1_w_list[i][j]
-        for i in range(10):
-            for j in range(300):
-                lin_neural_network_l2.W.data[i][j] = l2_w_list[i][j]
-        mlp = MLP(lin_neural_network_l1, lin_neural_network_l2)
-        file_images_name = '~/images_train/image_' + str(image_file_index)
-        file_labels_name = '~/labels_train/label_' + str(image_file_index)
-        if mode == 'test':
-            file_images_name = '~/images_test/images_' + str(image_file_index)
-            file_labels_name = '~/labels_test/label_' + str(image_file_index)
+            response = requests.get(url + 'deepLearning')
+            json_data = json.loads(response.text)
+            # response_message = response.content().decode('utf-8')
+            image_file_index = int(json_data['image_file_index'])
+            epoch_number = int(json_data['epoch_number'])
+            print('image_index_file: ' + str(image_file_index))
+            print('epoch_number: ' + str(epoch_number))
+            mode = str(json_data['mode'])
+            print('mode: ' + mode)
+            if mode == 'stop':
+                return
 
-        if mode == "train":
-            train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
-        else:
-            validate_test(_db, mode, mlp, epoch_number, file_images_name, file_labels_name)
+            if mode == 'wait':
+                time.sleep(1.5)
+                continue
+
+            client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
+            _db = client.primre
+            print('start download network')
+            try:
+                network = _db.Network.find_one({'id': 1})
+                l1_w_list = network['l1_list']
+                l2_w_list = network['l2_list']
+            except:
+                _db.GlobalParameters.update_one({'id': 1}, {'$inc': {'image_file_index': -1}})
+                continue
+            print('finish download network')
+            lin_neural_network_l1 = L.Linear(784, 300)
+            lin_neural_network_l2 = L.Linear(300, 10)
+            for i in range(300):
+                for j in range(784):
+                    lin_neural_network_l1.W.data[i][j] = l1_w_list[i][j]
+            for i in range(10):
+                for j in range(300):
+                    lin_neural_network_l2.W.data[i][j] = l2_w_list[i][j]
+            mlp = MLP(lin_neural_network_l1, lin_neural_network_l2)
+            file_images_name = '~/images_train/image_' + str(image_file_index)
+            file_labels_name = '~/labels_train/label_' + str(image_file_index)
+            if mode == 'test':
+                file_images_name = '~/images_test/images_' + str(image_file_index)
+                file_labels_name = '~/labels_test/label_' + str(image_file_index)
+
+            if mode == "train":
+                train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
+            else:
+                validate_test(_db, mode, mlp, epoch_number, file_images_name, file_labels_name)
+        except:
+            continue
 
 
 def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
