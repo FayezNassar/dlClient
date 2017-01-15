@@ -43,9 +43,13 @@ def main(client_id):
         client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
         _db = client.primre
         print('start download network')
-        network = _db.Network.find_one({'id': 1})
-        l1_w_list = network['l1_list']
-        l2_w_list = network['l2_list']
+        try:
+            network = _db.Network.find_one({'id': 1})
+            l1_w_list = network['l1_list']
+            l2_w_list = network['l2_list']
+        except:
+            _db.GlobalParameters.update_one({'id': 1}, {'$inc': {'image_file_index': -1}})
+            continue
         print('finish download network')
         lin_neural_network_l1 = L.Linear(784, 300)
         lin_neural_network_l2 = L.Linear(300, 10)
@@ -65,7 +69,7 @@ def main(client_id):
         if mode == "train":
             train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list)
         else:
-            validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name)
+            validate_test(_db, mode, mlp, epoch_number, file_images_name, file_labels_name)
 
 
 def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2_w_list):
@@ -77,19 +81,23 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     optimizer.setup(model)
     model.links()
 
-    print('start download file')
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
-    cmd_images = 'cat ' + file_images_name
-    images_stdin, images_stdout, images_stderr = ssh.exec_command(cmd_images)
-    read_image = str(images_stdout.read(), 'utf-8')
-    read_image = re.split('\[', read_image)
-    cmd_labels = 'cat ' + file_labels_name
-    labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
-    read_labels = str(labels_stdout.read(), 'utf-8')
-    ssh.close()
-    print('finish download file')
+    try:
+        print('start download file')
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
+        cmd_images = 'cat ' + file_images_name
+        images_stdin, images_stdout, images_stderr = ssh.exec_command(cmd_images)
+        read_image = str(images_stdout.read(), 'utf-8')
+        read_image = re.split('\[', read_image)
+        cmd_labels = 'cat ' + file_labels_name
+        labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
+        read_labels = str(labels_stdout.read(), 'utf-8')
+        ssh.close()
+        print('finish download file')
+    except:
+        _db.GlobalParameters.update_one({'id': 1}, {'$inc': {'image_file_index': -1}})
+        return
 
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
     images_array = [None] * 1200
@@ -123,20 +131,25 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     for i in range(300):
         for j in range(784):
             delta_layer1[i][j] = mlp.l1.W.data[i][j] - l1_w_list[i][j]
-    while _db.GlobalParameters.find_one({'id': 1})['list_busy'] == 1:
-        continue
-    _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 1}})
-    network = _db.Network.find_one({'id': 1})
-    l1_list = network['l1_list']
-    l2_list = network['l2_list']
-    for i in range(300):
-        for j in range(784):
-            l1_list[i][j] += (delta_layer1[i][j] * 0.1)  # 0.1 is the learning rate.
-    for i in range(10):
-        for j in range(300):
-            l2_list[i][j] += (delta_layer2[i][j] * 0.1)  # 0.1 is the learning rate.
-    _db.Network.update({'id': 1}, {'$set': {'l1_list': l1_list, 'l2_list': l2_list}})
-    _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 0}})
+    try:
+        while _db.GlobalParameters.find_one({'id': 1})['list_busy'] == 1:
+            continue
+        _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 1}})
+        network = _db.Network.find_one({'id': 1})
+        l1_list = network['l1_list']
+        l2_list = network['l2_list']
+        for i in range(300):
+            for j in range(784):
+                l1_list[i][j] += (delta_layer1[i][j] * 0.1)  # 0.1 is the learning rate.
+        for i in range(10):
+            for j in range(300):
+                l2_list[i][j] += (delta_layer2[i][j] * 0.1)  # 0.1 is the learning rate.
+        _db.Network.update({'id': 1}, {'$set': {'l1_list': l1_list, 'l2_list': l2_list}})
+        _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 0}})
+    except:
+        _db.GlobalParameters.update_one({'id': 1}, {'$inc': {'image_file_index': -1}})
+        _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 0}})
+        return
     data = {
         'id': client_id,
         'mode': 'train',
@@ -146,22 +159,26 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     requests.post(url + 'deepLearning"', json.dumps(data))
 
 
-def validate_test(mode, mlp, epoch_number, file_images_name, file_labels_name):
+def validate_test(_db, mode, mlp, epoch_number, file_images_name, file_labels_name):
     print('validate_test, mode is: ' + str(mode))
     # download validation files, images and labels.
-    print('start file download')
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
-    cmd_images = 'cat ' + file_images_name
-    images_stdin, images_stdout, images_stderr = ssh.exec_command(cmd_images)
-    read_image = str(images_stdout.read(), 'utf-8')
-    read_image = re.split('\[', read_image)
-    cmd_labels = 'cat ' + file_labels_name
-    labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
-    read_labels = str(labels_stdout.read(), 'utf-8')
-    ssh.close()
-    print('finish file download')
+    try:
+        print('start file download')
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect('t2.technion.ac.il', username='sfirasss', password='Firspn3#')
+        cmd_images = 'cat ' + file_images_name
+        images_stdin, images_stdout, images_stderr = ssh.exec_command(cmd_images)
+        read_image = str(images_stdout.read(), 'utf-8')
+        read_image = re.split('\[', read_image)
+        cmd_labels = 'cat ' + file_labels_name
+        labels_stdin, labels_stdout, labels_stderr = ssh.exec_command(cmd_labels)
+        read_labels = str(labels_stdout.read(), 'utf-8')
+        ssh.close()
+        print('finish file download')
+    except:
+        _db.GlobalParameters.update_one({'id': 1}, {'$inc': {'image_file_index': -1}})
+        return
 
     # fill the arrays of images the labels.
     label_array = np.fromstring(read_labels, dtype=np.int32, sep=',')
