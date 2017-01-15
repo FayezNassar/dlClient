@@ -43,8 +43,9 @@ def main(client_id):
         client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
         _db = client.primre
         print('start download network')
-        l1_w_list = _db.GlobalParameters.find_one({'id': 1})['l1_list']
-        l2_w_list = _db.GlobalParameters.find_one({'id': 1})['l2_list']
+        network = _db.Network.find_one({'id': 1})
+        l1_w_list = network['l1_list']
+        l2_w_list = network['l2_list']
         print('finish download network')
         lin_neural_network_l1 = L.Linear(784, 300)
         lin_neural_network_l2 = L.Linear(300, 10)
@@ -118,22 +119,23 @@ def train(_db, client_id, mlp, file_images_name, file_labels_name, l1_w_list, l2
     delta_layer2 = np.zeros((10, 300), dtype='float32')
     for i in range(10):
         for j in range(300):
-            delta_layer2[i][j] = mlp.l2.W.data[i][j] - l2_w_list[i][j];
+            delta_layer2[i][j] = mlp.l2.W.data[i][j] - l2_w_list[i][j]
     for i in range(300):
         for j in range(784):
-            delta_layer1[i][j] = mlp.l1.W.data[i][j] - l1_w_list[i][j];
+            delta_layer1[i][j] = mlp.l1.W.data[i][j] - l1_w_list[i][j]
     while _db.GlobalParameters.find_one({'id': 1})['list_busy'] == 1:
         continue
     _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 1}})
-    l1_list = _db.GlobalParameters.find_one({'id': 1})['l1_list']
-    l2_list = _db.GlobalParameters.find_one({'id': 1})['l2_list']
+    network = _db.Network.find_one({'id': 1})
+    l1_list = network['l1_list']
+    l2_list = network['l2_list']
     for i in range(300):
         for j in range(784):
             l1_list[i][j] += (delta_layer1[i][j] * 0.1)  # 0.1 is the learning rate.
     for i in range(10):
         for j in range(300):
             l2_list[i][j] += (delta_layer2[i][j] * 0.1)  # 0.1 is the learning rate.
-    _db.GlobalParameters.update({'id': 1}, {'$set': {'l1_list': l1_list, 'l2_list': l2_list}})
+    _db.Network.update({'id': 1}, {'$set': {'l1_list': l1_list, 'l2_list': l2_list}})
     _db.GlobalParameters.update({'id': 1}, {'$set': {'list_busy': 0}})
     data = {
         'id': client_id,
