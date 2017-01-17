@@ -41,7 +41,7 @@ def main(client_id):
                 time.sleep(1.5)
                 continue
 
-            client = MongoClient('mongodb://Fayez:Fayez93@ds157158.mlab.com:57158/primre')
+            client = MongoClient('mongodb://Fayez:Fayez93@ds111529.mlab.com:11529/primre')
             _db = client.primre
             print('start download network')
             try:
